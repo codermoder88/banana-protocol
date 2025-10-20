@@ -1,24 +1,18 @@
-import uuid
-from datetime import datetime
+from fastapi import APIRouter, Depends
 
-from fastapi import APIRouter
-
+from app.api.dependencies import get_sensor_manager
 from app.api.models.sensor_models import SensorCreateRequest, SensorCreateResponse, SensorListResponse
-from app.shared.models import Sensor
-from app.storage.implementations.in_memory_sensor_repository import InMemorySensorRepository
+from app.services.sensors_manager import SensorManager
 
 router = APIRouter()
 
 
 @router.post("", response_model=SensorCreateResponse, status_code=201)
-async def create_sensor(sensor: SensorCreateRequest) -> SensorCreateResponse:
+async def create_sensor(
+    sensor: SensorCreateRequest, sensor_manager: SensorManager = Depends(get_sensor_manager)
+) -> SensorCreateResponse:
     """Register a new sensor in the system."""
-    sensor_id = sensor.sensor_id if sensor.sensor_id else str(uuid.uuid4())
-
-    business_sensor = Sensor(sensor_id=sensor_id, sensor_type=sensor.sensor_type, created_at=datetime.now())
-
-    sensor_repository = InMemorySensorRepository()
-    created_sensor = sensor_repository.add_sensor(sensor=business_sensor)
+    created_sensor = sensor_manager.create_sensor(sensor_type=sensor.sensor_type, sensor_id=sensor.sensor_id)
     return SensorCreateResponse(
         sensor_id=created_sensor.sensor_id,
         sensor_type=created_sensor.sensor_type,
@@ -27,10 +21,9 @@ async def create_sensor(sensor: SensorCreateRequest) -> SensorCreateResponse:
 
 
 @router.get("", response_model=list[SensorListResponse])
-async def list_sensors() -> list[SensorListResponse]:
+async def list_sensors(sensor_manager: SensorManager = Depends(get_sensor_manager)) -> list[SensorListResponse]:
     """Retrieve all registered sensors."""
-    sensor_repository = InMemorySensorRepository()
-    business_sensors = sensor_repository.list_sensors()
+    business_sensors = sensor_manager.list_sensors()
     return [
         SensorListResponse(
             sensor_id=sensor.sensor_id, sensor_type=sensor.sensor_type, created_at=sensor.created_at.isoformat() + "Z"

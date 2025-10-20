@@ -27,3 +27,10 @@ class Metric(BaseModel):
     metric_type: MetricType
     timestamp: datetime
     value: float
+
+
+class AggregatedMetricResult(BaseModel):
+    sensor_id: str
+    metric_type: MetricType
+    statistic: StatisticType
+    value: float
