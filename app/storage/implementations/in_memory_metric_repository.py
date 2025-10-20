@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.shared.models import Metric, MetricType, StatisticType
+from app.shared.models import AggregatedMetricResult, Metric, MetricType, StatisticType
 from app.storage.interfaces.metric_repository import MetricRepository
 
 
@@ -17,6 +17,46 @@ class InMemoryMetricRepository(MetricRepository):
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
         statistic: StatisticType | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[AggregatedMetricResult]:
+        if statistic is None:
+            raise ValueError("Statistic type must be specified for aggregated queries")
+
+        # Get filtered raw metrics
+        raw_metrics = self.get_raw_metrics(
+            sensor_ids=sensor_ids,
+            metrics=metrics,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        # Group metrics by sensor_id and metric_type
+        grouped_metrics: dict[tuple[str, MetricType], list[float]] = {}
+        for metric in raw_metrics:
+            key = (metric.sensor_id, metric.metric_type)
+            if key not in grouped_metrics:
+                grouped_metrics[key] = []
+            grouped_metrics[key].append(metric.value)
+
+        # Calculate aggregated results
+        results: list[AggregatedMetricResult] = []
+        for (sensor_id, metric_type), values in grouped_metrics.items():
+            aggregated_value = self._calculate_statistic(values=values, statistic=statistic)
+            result = AggregatedMetricResult(
+                sensor_id=sensor_id,
+                metric_type=metric_type,
+                statistic=statistic,
+                value=aggregated_value,
+            )
+            results.append(result)
+
+        return results
+
+    def get_raw_metrics(
+        self,
+        sensor_ids: list[str] | None = None,
+        metrics: list[MetricType] | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> list[Metric]:
@@ -63,3 +103,19 @@ class InMemoryMetricRepository(MetricRepository):
             filtered.append(metric)
 
         return filtered
+
+    def _calculate_statistic(self, values: list[float], statistic: StatisticType) -> float:
+        if not values:
+            return 0.0
+
+        match statistic:
+            case StatisticType.MIN:
+                return min(values)
+            case StatisticType.MAX:
+                return max(values)
+            case StatisticType.AVG:
+                return sum(values) / len(values)
+            case StatisticType.SUM:
+                return sum(values)
+            case _:
+                return 0.0

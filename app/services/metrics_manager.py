@@ -1,7 +1,5 @@
 from datetime import datetime
 
-from pydantic import BaseModel
-
 from app.api.models.metric_models import (
     MetricCreateRequest,
     MetricCreateResponse,
@@ -13,12 +11,6 @@ from app.api.models.metric_models import (
 from app.shared.models import AggregatedMetricResult, Metric, MetricType, StatisticType
 from app.storage.interfaces.metric_repository import MetricRepository
 from app.storage.interfaces.sensor_repository import SensorRepository
-
-
-class MetricGroup(BaseModel):
-    sensor_id: str
-    metric_type: MetricType
-    values: list[float]
 
 
 class MetricManager:
@@ -87,7 +79,8 @@ class MetricManager:
 
         target_sensor_ids = self._get_target_sensor_ids(sensor_ids=sensor_ids)
 
-        filtered_metrics = self._get_filtered_metrics(
+        # Repository now handles aggregation directly
+        return self._metric_repository.query_metrics(
             sensor_ids=target_sensor_ids,
             metrics=metrics,
             statistic=statistic,
@@ -95,108 +88,9 @@ class MetricManager:
             end_date=end_date,
         )
 
-        metric_groups = self._group_metrics_by_sensor_and_type(metrics=filtered_metrics)
-
-        aggregated_results = self._calculate_aggregated_results(metric_groups=metric_groups, statistic=statistic)
-
-        return aggregated_results
-
     def _get_target_sensor_ids(self, sensor_ids: list[str] | None) -> list[str]:
         if sensor_ids is None:
             # Note: Unsustianable for large datasets - pagination would be nice
             all_sensors = self._sensor_repository.list_sensors()
             return [sensor.sensor_id for sensor in all_sensors]
         return sensor_ids
-
-    def _get_filtered_metrics(
-        self,
-        sensor_ids: list[str],
-        metrics: list[MetricType],
-        statistic: StatisticType,
-        start_date: str | None,
-        end_date: str | None,
-    ) -> list[Metric]:
-        return self._metric_repository.query_metrics(
-            sensor_ids=sensor_ids,
-            metrics=metrics,
-            statistic=statistic,
-            start_date=start_date,
-            end_date=end_date,
-        )
-
-    def _group_metrics_by_sensor_and_type(self, metrics: list[Metric]) -> list[MetricGroup]:
-        sensor_metric_values: dict[str, dict[MetricType, list[float]]] = {}
-
-        for metric in metrics:
-            self._add_metric_to_group(
-                sensor_metric_values=sensor_metric_values,
-                sensor_id=metric.sensor_id,
-                metric_type=metric.metric_type,
-                value=metric.value,
-            )
-
-        return self._create_metric_groups(sensor_metric_values=sensor_metric_values)
-
-    def _add_metric_to_group(
-        self,
-        sensor_metric_values: dict[str, dict[MetricType, list[float]]],
-        sensor_id: str,
-        metric_type: MetricType,
-        value: float,
-    ) -> None:
-        if sensor_id not in sensor_metric_values:
-            sensor_metric_values[sensor_id] = {}
-
-        if metric_type not in sensor_metric_values[sensor_id]:
-            sensor_metric_values[sensor_id][metric_type] = []
-
-        sensor_metric_values[sensor_id][metric_type].append(value)
-
-    def _create_metric_groups(
-        self, sensor_metric_values: dict[str, dict[MetricType, list[float]]]
-    ) -> list[MetricGroup]:
-        metric_groups: list[MetricGroup] = []
-
-        for sensor_id, metric_types_dict in sensor_metric_values.items():
-            for metric_type, values in metric_types_dict.items():
-                group = MetricGroup(sensor_id=sensor_id, metric_type=metric_type, values=values)
-                metric_groups.append(group)
-
-        return metric_groups
-
-    def _calculate_aggregated_results(
-        self, metric_groups: list[MetricGroup], statistic: StatisticType
-    ) -> list[AggregatedMetricResult]:
-        results: list[AggregatedMetricResult] = []
-
-        for group in metric_groups:
-            aggregated_value = self._calculate_statistic(values=group.values, statistic=statistic)
-
-            result = AggregatedMetricResult(
-                sensor_id=group.sensor_id,
-                metric_type=group.metric_type,
-                statistic=statistic,
-                value=aggregated_value,
-            )
-            results.append(result)
-
-        return results
-
-    def _calculate_statistic(self, values: list[float], statistic: StatisticType) -> float:
-        if not values:
-            return 0.0
-
-        match statistic:
-            case StatisticType.MIN:
-                return min(values)
-            case StatisticType.MAX:
-                return max(values)
-            case StatisticType.AVG:
-                return sum(values) / len(values)
-            case StatisticType.SUM:
-                return sum(values)
-            case _:
-                return 0.0
-
-        # This should never be reached due to the catch-all case above
-        return 0.0

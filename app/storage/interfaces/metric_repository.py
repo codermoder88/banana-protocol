@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from app.shared.models import Metric, MetricType, StatisticType
+from app.shared.models import AggregatedMetricResult, Metric, MetricType, StatisticType
 
 
 class MetricRepository(ABC):
@@ -14,6 +14,16 @@ class MetricRepository(ABC):
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
         statistic: StatisticType | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[AggregatedMetricResult]:
+        pass
+
+    @abstractmethod
+    def get_raw_metrics(
+        self,
+        sensor_ids: list[str] | None = None,
+        metrics: list[MetricType] | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> list[Metric]:
