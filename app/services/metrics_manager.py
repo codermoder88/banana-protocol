@@ -2,6 +2,14 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.api.models.metric_models import (
+    MetricCreateRequest,
+    MetricCreateResponse,
+    MetricQueryRequest,
+    MetricQueryResponse,
+    MetricQueryResult,
+    StatisticResult,
+)
 from app.shared.models import AggregatedMetricResult, Metric, MetricType, StatisticType
 from app.storage.interfaces.metric_repository import MetricRepository
 from app.storage.interfaces.sensor_repository import SensorRepository
@@ -18,12 +26,41 @@ class MetricManager:
         self._metric_repository = metric_repository
         self._sensor_repository = sensor_repository
 
-    def record_metric(self, sensor_id: str, metric_type: MetricType, timestamp: datetime, value: float) -> Metric:
+    def record_metric(self, sensor_id: str, metric_request: MetricCreateRequest) -> MetricCreateResponse:
         if not self._sensor_repository.sensor_exists(sensor_id=sensor_id):
             raise ValueError("Sensor not found")
 
-        metric = Metric(sensor_id=sensor_id, metric_type=metric_type, timestamp=timestamp, value=value)
-        return self._metric_repository.add_metric(metric=metric)
+        parsed_timestamp = datetime.fromisoformat(metric_request.timestamp.replace("Z", "+00:00"))
+
+        metric = Metric(
+            sensor_id=sensor_id,
+            metric_type=metric_request.metric_type,
+            timestamp=parsed_timestamp,
+            value=metric_request.value,
+        )
+        self._metric_repository.add_metric(metric=metric)
+
+        return MetricCreateResponse(sensor_id=sensor_id, status="data_recorded", timestamp=metric_request.timestamp)
+
+    def query_metrics_api(self, query_request: MetricQueryRequest) -> MetricQueryResponse:
+        aggregates = self.query_metrics(
+            sensor_ids=query_request.sensor_ids,
+            metrics=query_request.metrics,
+            statistic=query_request.statistic,
+            start_date=query_request.start_date,
+            end_date=query_request.end_date,
+        )
+
+        results = [
+            MetricQueryResult(
+                sensor_id=agg.sensor_id,
+                metric=agg.metric_type,
+                stat=StatisticResult(statistic_type=query_request.statistic, value=agg.value),
+            )
+            for agg in aggregates
+        ]
+
+        return MetricQueryResponse(query=query_request, results=results)
 
     def query_metrics(
         self,
@@ -39,7 +76,6 @@ class MetricManager:
         if statistic is None:
             raise ValueError("Statistic type must be specified")
 
-        # Validate dates if provided
         if start_date and end_date:
             try:
                 start_dt = datetime.fromisoformat(start_date)
@@ -67,7 +103,7 @@ class MetricManager:
 
     def _get_target_sensor_ids(self, sensor_ids: list[str] | None) -> list[str]:
         if sensor_ids is None:
-            # Note: This could be expensive for large datasets - consider pagination or caching
+            # Note: Unsustianable for large datasets - pagination would be nice
             all_sensors = self._sensor_repository.list_sensors()
             return [sensor.sensor_id for sensor in all_sensors]
         return sensor_ids

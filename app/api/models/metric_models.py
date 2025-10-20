@@ -1,18 +1,6 @@
-from enum import Enum
-
 from pydantic import BaseModel
 
-
-class MetricType(str, Enum):
-    TEMPERATURE = "temperature"
-    HUMIDITY = "humidity"
-
-
-class StatisticType(str, Enum):
-    MIN = "min"
-    MAX = "max"
-    AVG = "avg"
-    SUM = "sum"
+from app.shared.models import MetricType, StatisticType
 
 
 class MetricCreateRequest(BaseModel):
