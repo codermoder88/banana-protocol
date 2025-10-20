@@ -1,0 +1,88 @@
+[tool.poetry]
+name = "genesys-assessment"
+version = "0.1.0"
+description = ""
+authors = ["Peter"]
+license = "MIT"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pydantic = "^2.0"
+fastapi = "^0.104"
+uvicorn = "^0.24"
+sqlalchemy = "^2.0"
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = "*"
+pytest-asyncio = "*"
+pytest-cov = "*"
+faker = "*"
+requests = "*"
+black = "*"
+flake8 = "*"
+flake8-bugbear = "*"
+flake8-return = "*"
+flake8-simplify = "*"
+flake8-eradicate = "*"
+flake8-variables-names = "*"
+flake8-pyproject = "*"
+flake8-modern-annotations = "*"
+isort = "*"
+mypy = "*"
+bandit = "*"
+coverage = "*"
+
+[tool.black]
+line-length = 120
+target-version = ['py312']
+# extend-exclude =
+
+[tool.isort]
+line_length = 120
+profile = "black"
+known_first_party = ["app"]
+no_lines_before = ["LOCALFOLDER"]
+skip_glob = [""]
+
+[tool.flake8]
+max-line-length = 120
+max-complexity = 12
+exclude = [".venv"]
+ignore = ["E501", "W503", "W504", "B008", "SIM104", "R504", "SIM106", "E704"]
+
+[tool.mypy]
+python_version = "3.12"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+exclude = []
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+
+[tool.coverage.run]
+branch = true
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 80
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "module"
+asyncio_mode = "auto"
+
+testpaths = ["tests"]
+norecursedirs = [""]
+
+[tool.bandit]
+exclude_dirs = [""]
+skips = ["B101", "B104", "B404", "B603", "B607"]
+
+[build-system]
+requires = ["poetry>=1.8.1"]
+build-backend = "poetry.core.masonry.api"
