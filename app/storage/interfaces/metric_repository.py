@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from app.shared.models import AggregatedMetricResult, Metric, MetricType, StatisticType
 
@@ -14,8 +15,8 @@ class MetricRepository(ABC):
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
         statistic: StatisticType | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> list[AggregatedMetricResult]:
         pass
 
@@ -24,8 +25,8 @@ class MetricRepository(ABC):
         self,
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> list[Metric]:
         pass
 

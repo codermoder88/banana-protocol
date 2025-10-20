@@ -18,7 +18,7 @@ class SensorManager:
         return SensorCreateResponse(
             sensor_id=created_sensor.sensor_id,
             sensor_type=created_sensor.sensor_type,
-            created_at=created_sensor.created_at.isoformat() + "Z",
+            created_at=created_sensor.created_at,
         )
 
     def list_sensors(self) -> list[SensorListResponse]:
@@ -27,7 +27,7 @@ class SensorManager:
             SensorListResponse(
                 sensor_id=sensor.sensor_id,
                 sensor_type=sensor.sensor_type,
-                created_at=sensor.created_at.isoformat() + "Z",
+                created_at=sensor.created_at,
             )
             for sensor in business_sensors
         ]

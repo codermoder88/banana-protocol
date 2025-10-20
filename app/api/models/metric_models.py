@@ -1,10 +1,12 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 from app.shared.models import MetricType, StatisticType
 
 
 class MetricCreateRequest(BaseModel):
-    timestamp: str
+    timestamp: datetime
     metric_type: MetricType
     value: float
 
@@ -13,8 +15,8 @@ class MetricQueryRequest(BaseModel):
     sensor_ids: list[str] | None = None
     metrics: list[MetricType]
     statistic: StatisticType
-    start_date: str | None = None
-    end_date: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
 
 
 class StatisticResult(BaseModel):
@@ -31,7 +33,7 @@ class MetricQueryResult(BaseModel):
 class MetricCreateResponse(BaseModel):
     sensor_id: str
     status: str
-    timestamp: str
+    timestamp: datetime
 
 
 class MetricQueryResponse(BaseModel):

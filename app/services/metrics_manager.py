@@ -22,12 +22,10 @@ class MetricManager:
         if not self._sensor_repository.sensor_exists(sensor_id=sensor_id):
             raise ValueError("Sensor not found")
 
-        parsed_timestamp = datetime.fromisoformat(metric_request.timestamp.replace("Z", "+00:00"))
-
         metric = Metric(
             sensor_id=sensor_id,
             metric_type=metric_request.metric_type,
-            timestamp=parsed_timestamp,
+            timestamp=metric_request.timestamp,
             value=metric_request.value,
         )
         self._metric_repository.add_metric(metric=metric)
@@ -59,8 +57,8 @@ class MetricManager:
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
         statistic: StatisticType | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> list[AggregatedMetricResult]:
         if not metrics:
             raise ValueError("At least one metric type must be specified")
@@ -68,14 +66,8 @@ class MetricManager:
         if statistic is None:
             raise ValueError("Statistic type must be specified")
 
-        if start_date and end_date:
-            try:
-                start_dt = datetime.fromisoformat(start_date)
-                end_dt = datetime.fromisoformat(end_date)
-                if start_dt >= end_dt:
-                    raise ValueError("Start date must be before end date")
-            except ValueError as e:
-                raise ValueError(f"Invalid date format: {e}")
+        if start_date and end_date and start_date >= end_date:
+            raise ValueError("Start date must be before end date")
 
         target_sensor_ids = self._get_target_sensor_ids(sensor_ids=sensor_ids)
 

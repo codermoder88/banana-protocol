@@ -17,8 +17,8 @@ class InMemoryMetricRepository(MetricRepository):
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
         statistic: StatisticType | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> list[AggregatedMetricResult]:
         if statistic is None:
             raise ValueError("Statistic type must be specified for aggregated queries")
@@ -57,8 +57,8 @@ class InMemoryMetricRepository(MetricRepository):
         self,
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> list[Metric]:
         filtered_metrics = self._metrics.copy()
 
@@ -83,22 +83,18 @@ class InMemoryMetricRepository(MetricRepository):
         return [m for m in self._metrics if m.metric_type == metric_type]
 
     def _filter_by_date_range(
-        self, metrics: list[Metric], start_date: str | None, end_date: str | None
+        self, metrics: list[Metric], start_date: datetime | None, end_date: datetime | None
     ) -> list[Metric]:
         filtered = []
 
         for metric in metrics:
             metric_timestamp = metric.timestamp
 
-            if start_date:
-                start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
-                if metric_timestamp < start_dt:
-                    continue
+            if start_date and metric_timestamp < start_date:
+                continue
 
-            if end_date:
-                end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
-                if metric_timestamp > end_dt:
-                    continue
+            if end_date and metric_timestamp > end_date:
+                continue
 
             filtered.append(metric)
 
@@ -119,3 +115,6 @@ class InMemoryMetricRepository(MetricRepository):
                 return sum(values)
             case _:
                 return 0.0
+
+        # This should never be reached due to exhaustive match, but satisfies linter
+        return 0.0

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.dependencies import get_metric_manager
@@ -42,8 +44,12 @@ async def query_metrics(
 ) -> MetricQueryResponse:
     """Query aggregated statistics for one or more sensors and metrics within an optional date range."""
     try:
+        # Convert string dates to datetime objects
+        start_dt = datetime.fromisoformat(start_date) if start_date else None
+        end_dt = datetime.fromisoformat(end_date) if end_date else None
+
         query_request = MetricQueryRequest(
-            sensor_ids=sensor_ids, metrics=metrics, statistic=statistic, start_date=start_date, end_date=end_date
+            sensor_ids=sensor_ids, metrics=metrics, statistic=statistic, start_date=start_dt, end_date=end_dt
         )
         return metric_manager.query_metrics_api(query_request=query_request)
     except ValueError as e:

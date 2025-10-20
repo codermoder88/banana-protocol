@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -9,10 +11,10 @@ class SensorCreateRequest(BaseModel):
 class SensorCreateResponse(BaseModel):
     sensor_id: str
     sensor_type: str
-    created_at: str
+    created_at: datetime
 
 
 class SensorListResponse(BaseModel):
     sensor_id: str
     sensor_type: str
-    created_at: str
+    created_at: datetime
