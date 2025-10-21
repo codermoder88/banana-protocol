@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.dependencies import get_sensor_manager
 from app.api.models.sensor_models import SensorCreateRequest, SensorCreateResponse, SensorListResponse
 from app.services.sensors_manager import SensorManager
+from app.shared.exceptions import DatabaseError, ValidationError
 
 router = APIRouter()
 
@@ -13,7 +14,11 @@ async def create_sensor(
 ) -> SensorCreateResponse:
     """Register a new sensor in the system."""
     try:
-        return sensor_manager.create_sensor(sensor_request=sensor)
+        return await sensor_manager.create_sensor(sensor_request=sensor)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
+    except DatabaseError as e:
+        raise HTTPException(status_code=409, detail=f"Database error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create sensor: {str(e)}")
 
@@ -22,6 +27,8 @@ async def create_sensor(
 async def list_sensors(sensor_manager: SensorManager = Depends(get_sensor_manager)) -> list[SensorListResponse]:
     """Retrieve all registered sensors."""
     try:
-        return sensor_manager.list_sensors()
+        return await sensor_manager.list_sensors()
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve sensors: {str(e)}")
