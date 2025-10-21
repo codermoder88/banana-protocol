@@ -84,9 +84,39 @@ class PostgreSQLMetricRepository(MetricRepository):
         except SQLAlchemyError as e:
             raise DatabaseError(f"Database error while getting metrics by type: {str(e)}") from e
 
-    # =============================================================================
-    # Helper Methods - Model Conversion
-    # =============================================================================
+    async def get_latest_timestamps(
+        self, sensor_ids: list[str], metrics: list[MetricType]
+    ) -> dict[tuple[str, MetricType], datetime]:
+        try:
+            metric_values = [metric.value for metric in metrics]
+            query = (
+                select(
+                    MetricModel.sensor_id,
+                    MetricModel.metric_type,
+                    func.max(MetricModel.timestamp).label("latest_timestamp"),
+                )
+                .where(
+                    and_(
+                        MetricModel.sensor_id.in_(sensor_ids),
+                        MetricModel.metric_type.in_(metric_values),
+                    )
+                )
+                .group_by(MetricModel.sensor_id, MetricModel.metric_type)
+            )
+
+            result = await self._session.execute(query)
+            rows = result.all()
+
+            latest_timestamps = {}
+            for row in rows:
+                sensor_id = str(row.sensor_id)
+                metric_type = MetricType(row.metric_type)
+                latest_timestamp = row.latest_timestamp
+                latest_timestamps[(sensor_id, metric_type)] = latest_timestamp
+
+            return latest_timestamps
+        except SQLAlchemyError as e:
+            raise DatabaseError(f"Database error while getting latest timestamps: {str(e)}") from e
 
     def _create_metric_model(self, metric: Metric) -> MetricModel:
         return MetricModel(
@@ -188,7 +218,6 @@ class PostgreSQLMetricRepository(MetricRepository):
             case _:
                 raise ValueError(f"Unsupported statistic type: {statistic}")
 
-        # This should never be reached due to exhaustive match
         raise ValueError(f"Unsupported statistic type: {statistic}")
 
     async def _handle_duplicate_metric(self, metric: Metric, error: IntegrityError) -> Metric:
@@ -200,7 +229,6 @@ class PostgreSQLMetricRepository(MetricRepository):
             )
             return existing_metric if existing_metric else metric
         except SQLAlchemyError:
-            # If we can't retrieve the existing metric, re-raise the original error
             raise DatabaseError(f"Failed to add metric due to constraint violation: {str(error)}") from error
 
     async def _get_metric_by_key(self, sensor_id: str, metric_type: MetricType, timestamp: datetime) -> Metric | None:

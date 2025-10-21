@@ -15,18 +15,6 @@ class SensorNotFoundError(SensorMetricsError):
     pass
 
 
-class InvalidSensorIdError(SensorMetricsError):
-    """Raised when sensor ID is invalid."""
-
-    pass
-
-
-class InvalidMetricValueError(SensorMetricsError):
-    """Raised when metric value is invalid."""
-
-    pass
-
-
 class DatabaseError(SensorMetricsError):
     """Raised when database operation fails."""
 

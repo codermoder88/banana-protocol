@@ -37,3 +37,9 @@ class MetricRepository(ABC):
     @abstractmethod
     async def get_metrics_by_type(self, metric_type: MetricType) -> list[Metric]:
         pass
+
+    @abstractmethod
+    async def get_latest_timestamps(
+        self, sensor_ids: list[str], metrics: list[MetricType]
+    ) -> dict[tuple[str, MetricType], datetime]:
+        pass

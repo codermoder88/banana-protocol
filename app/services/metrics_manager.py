@@ -67,20 +67,16 @@ class MetricManager:
         if statistic is None:
             raise ValidationError("Statistic type must be specified")
 
-        if start_date and end_date and start_date >= end_date:
-            raise ValidationError("Start date must be before end date")
-
-        # Validate date range is between 1 and 31 days
-        if start_date and end_date:
-            date_range_days = (end_date - start_date).days
-            if date_range_days < 1:
-                raise ValidationError("Date range must be at least 1 day")
-            if date_range_days > 31:
-                raise ValidationError("Date range cannot exceed 31 days")
+        self._validate_date_range(start_date=start_date, end_date=end_date)
 
         target_sensor_ids = await self._get_target_sensor_ids(sensor_ids=sensor_ids)
 
-        # Repository now handles aggregation directly
+        if start_date is None and end_date is None:
+            return await self._query_latest_metrics(
+                sensor_ids=target_sensor_ids,
+                metrics=metrics,
+                statistic=statistic,
+            )
         return await self._metric_repository.query_metrics(
             sensor_ids=target_sensor_ids,
             metrics=metrics,
@@ -89,9 +85,43 @@ class MetricManager:
             end_date=end_date,
         )
 
+    def _validate_date_range(self, start_date: datetime | None, end_date: datetime | None) -> None:
+        if start_date and end_date and start_date >= end_date:
+            raise ValidationError("Start date must be before end date")
+
+        if start_date and end_date:
+            date_range_days = (end_date - start_date).days
+            if date_range_days < 1:
+                raise ValidationError("Date range must be at least 1 day")
+            if date_range_days > 31:
+                raise ValidationError("Date range cannot exceed 31 days")
+
+    async def _query_latest_metrics(
+        self,
+        sensor_ids: list[str],
+        metrics: list[MetricType],
+        statistic: StatisticType,
+    ) -> list[AggregatedMetricResult]:
+        latest_timestamps = await self._metric_repository.get_latest_timestamps(sensor_ids=sensor_ids, metrics=metrics)
+
+        results = []
+        for sensor_id in sensor_ids:
+            for metric in metrics:
+                latest_timestamp = latest_timestamps.get((sensor_id, metric))
+                if latest_timestamp is not None:
+                    latest_metrics = await self._metric_repository.query_metrics(
+                        sensor_ids=[sensor_id],
+                        metrics=[metric],
+                        statistic=statistic,
+                        start_date=latest_timestamp,
+                        end_date=latest_timestamp,
+                    )
+                    results.extend(latest_metrics)
+
+        return results
+
     async def _get_target_sensor_ids(self, sensor_ids: list[str] | None) -> list[str]:
         if sensor_ids is None:
-            # Note: Unsustainable for large datasets - pagination would be nice
             all_sensors = await self._sensor_repository.list_sensors()
             return [sensor.sensor_id for sensor in all_sensors]
         return sensor_ids

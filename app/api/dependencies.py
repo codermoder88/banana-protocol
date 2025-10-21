@@ -1,22 +1,33 @@
 from collections.abc import AsyncGenerator
 
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.metrics_manager import MetricManager
 from app.services.sensors_manager import SensorManager
+from app.storage.database_config import get_db_config
+from app.storage.implementations.postgresql_metric_repository import PostgreSQLMetricRepository
+from app.storage.implementations.postgresql_sensor_repository import PostgreSQLSensorRepository
 from app.storage.interfaces.metric_repository import MetricRepository
 from app.storage.interfaces.sensor_repository import SensorRepository
-from app.storage.repository_factory import repository_factory
 
 
-async def get_sensor_repository() -> AsyncGenerator[SensorRepository, None]:
-    async for repo in repository_factory.get_sensor_repository():
-        yield repo
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    db_config = get_db_config()
+    async for session in db_config.get_session():
+        yield session
 
 
-async def get_metric_repository() -> AsyncGenerator[MetricRepository, None]:
-    async for repo in repository_factory.get_metric_repository():
-        yield repo
+async def get_sensor_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> SensorRepository:
+    return PostgreSQLSensorRepository(session=session)
+
+
+async def get_metric_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> MetricRepository:
+    return PostgreSQLMetricRepository(session=session)
 
 
 async def get_sensor_manager(
