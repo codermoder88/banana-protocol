@@ -53,10 +53,15 @@ async def query_metrics(
     end_date: str | None = Query(None, description="End date (ISO format)"),
     metric_manager: MetricManager = Depends(get_metric_manager),
 ) -> MetricQueryResponse:
-    start_dt = _parse_date_string(start_date, "start_date")
-    end_dt = _parse_date_string(end_date, "end_date")
+    try:
+        start_dt = _parse_date_string(start_date, "start_date")
+        end_dt = _parse_date_string(end_date, "end_date")
 
-    query_request = MetricQueryRequest(
-        sensor_ids=sensor_ids, metrics=metrics, statistic=statistic, start_date=start_dt, end_date=end_dt
-    )
-    return await metric_manager.query_metrics_api(query_request=query_request)
+        query_request = MetricQueryRequest(
+            sensor_ids=sensor_ids, metrics=metrics, statistic=statistic, start_date=start_dt, end_date=end_dt
+        )
+        return await metric_manager.query_metrics_api(query_request=query_request)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to query metrics: {str(e)}")
