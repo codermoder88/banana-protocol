@@ -16,7 +16,7 @@ lint:
 	poetry run bandit -c pyproject.toml -r app tests
 
 test:
-	poetry run pytest
+	poetry run pytest tests --asyncio-mode=auto
 
 docker-up:
 	docker-compose -f docker-compose.yml up --build
@@ -30,6 +30,3 @@ docker-clean:
 docker-logs:
 	docker-compose -f docker-compose.yml logs -f
 
-# Health Check
-health:
-	curl -f http://localhost:8000/health || echo "Health check failed"
