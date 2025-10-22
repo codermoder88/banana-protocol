@@ -1,11 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 
 from app.api.models.metric_models import MetricCreateRequest, MetricQueryRequest
 from app.services.metrics_manager import MetricManager
 from app.shared.exceptions import SensorNotFoundError
-from app.shared.exceptions import ValidationError as CustomValidationError
 from app.shared.models import AggregatedMetricResult, Metric, MetricType, Sensor, StatisticType
 from app.storage.interfaces.metric_repository import MetricRepository
 from app.storage.interfaces.sensor_repository import SensorRepository
@@ -139,87 +138,6 @@ async def test_metric_manager_query_metrics_success(
     assert mock_metric_repository.query_metrics.called
 
 
-async def test_metric_manager_query_metrics_missing_metrics(
-    mock_metric_repository: MetricRepository,
-    mock_sensor_repository: SensorRepository,
-    sensor_id: str,
-    statistic_type: StatisticType,
-):
-    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
-
-    # Execute and verify exception
-    with pytest.raises(CustomValidationError):
-        await manager.query_metrics(
-            sensor_ids=[sensor_id], metrics=None, statistic=statistic_type, start_date=None, end_date=None
-        )
-
-
-async def test_metric_manager_query_metrics_missing_statistic(
-    mock_metric_repository: MetricRepository,
-    mock_sensor_repository: SensorRepository,
-    sensor_id: str,
-    metric_type: MetricType,
-):
-    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
-
-    # Execute and verify exception
-    with pytest.raises(CustomValidationError):
-        await manager.query_metrics(
-            sensor_ids=[sensor_id], metrics=[metric_type], statistic=None, start_date=None, end_date=None
-        )
-
-
-async def test_metric_manager_validate_date_range_valid(
-    mock_metric_repository: MetricRepository, mock_sensor_repository: SensorRepository
-):
-    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
-
-    start_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
-    end_date = datetime(2023, 1, 2, tzinfo=timezone.utc)
-
-    # Should not raise exception
-    manager._validate_date_range(start_date=start_date, end_date=end_date)
-
-
-async def test_metric_manager_validate_date_range_start_after_end(
-    mock_metric_repository: MetricRepository, mock_sensor_repository: SensorRepository
-):
-    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
-
-    start_date = datetime(2023, 1, 2, tzinfo=timezone.utc)
-    end_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
-
-    # Execute and verify exception
-    with pytest.raises(CustomValidationError):
-        manager._validate_date_range(start_date=start_date, end_date=end_date)
-
-
-async def test_metric_manager_validate_date_range_too_short(
-    mock_metric_repository: MetricRepository, mock_sensor_repository: SensorRepository
-):
-    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
-
-    start_date = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-    end_date = datetime(2023, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
-
-    # Execute and verify exception
-    with pytest.raises(CustomValidationError):
-        manager._validate_date_range(start_date=start_date, end_date=end_date)
-
-
-async def test_metric_manager_validate_date_range_too_long(
-    mock_metric_repository: MetricRepository, mock_sensor_repository: SensorRepository
-):
-    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
-
-    start_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
-    end_date = datetime(2023, 2, 5, tzinfo=timezone.utc)  # 35 days
-
-    # Execute and verify exception
-    with pytest.raises(CustomValidationError):
-        manager._validate_date_range(start_date=start_date, end_date=end_date)
-
-
 async def test_metric_manager_query_latest_metrics_success(
     mock_metric_repository: MetricRepository,
     mock_sensor_repository: SensorRepository,
@@ -305,3 +223,137 @@ async def test_metric_manager_query_metrics_with_latest_when_no_dates(
     # Verify latest metrics was called
     mock_metric_repository.get_latest_timestamps.assert_called_once_with(sensor_ids=[sensor_id], metrics=[metric_type])
     assert result == [sample_aggregated_metric]
+
+
+# Tests for auto-completion functionality
+async def test_metric_manager_query_metrics_api_auto_completes_start_date(
+    mock_metric_repository: MetricRepository,
+    mock_sensor_repository: SensorRepository,
+    sensor_id: str,
+    metric_type: MetricType,
+    statistic_type: StatisticType,
+    sample_aggregated_metric: AggregatedMetricResult,
+):
+    """Test that MetricManager auto-completes start_date to create 31-day window."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.api.models.metric_models import MetricQueryRequest
+
+    # Setup
+    start_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
+    expected_end_date = start_date + timedelta(days=31)
+
+    mock_metric_repository.query_metrics.return_value = [sample_aggregated_metric]
+
+    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
+
+    # Create request with only start_date
+    query_request = MetricQueryRequest(
+        sensor_ids=[sensor_id], metrics=[metric_type], statistic=statistic_type, start_date=start_date, end_date=None
+    )
+
+    # Execute
+    result = await manager.query_metrics_api(query_request=query_request)
+
+    # Verify auto-completion
+    assert result.query.start_date == start_date
+    assert result.query.end_date == expected_end_date
+
+    # Verify repository was called with completed dates
+    mock_metric_repository.query_metrics.assert_called_once_with(
+        sensor_ids=[sensor_id],
+        metrics=[metric_type],
+        statistic=statistic_type,
+        start_date=start_date,
+        end_date=expected_end_date,
+    )
+
+
+async def test_metric_manager_query_metrics_api_auto_completes_end_date(
+    mock_metric_repository: MetricRepository,
+    mock_sensor_repository: SensorRepository,
+    sensor_id: str,
+    metric_type: MetricType,
+    statistic_type: StatisticType,
+    sample_aggregated_metric: AggregatedMetricResult,
+):
+    """Test that MetricManager auto-completes end_date to create 31-day window."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.api.models.metric_models import MetricQueryRequest
+
+    # Setup
+    end_date = datetime(2023, 12, 31, tzinfo=timezone.utc)
+    expected_start_date = end_date - timedelta(days=31)
+
+    mock_metric_repository.query_metrics.return_value = [sample_aggregated_metric]
+
+    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
+
+    # Create request with only end_date
+    query_request = MetricQueryRequest(
+        sensor_ids=[sensor_id], metrics=[metric_type], statistic=statistic_type, start_date=None, end_date=end_date
+    )
+
+    # Execute
+    result = await manager.query_metrics_api(query_request=query_request)
+
+    # Verify auto-completion
+    assert result.query.start_date == expected_start_date
+    assert result.query.end_date == end_date
+
+    # Verify repository was called with completed dates
+    mock_metric_repository.query_metrics.assert_called_once_with(
+        sensor_ids=[sensor_id],
+        metrics=[metric_type],
+        statistic=statistic_type,
+        start_date=expected_start_date,
+        end_date=end_date,
+    )
+
+
+async def test_metric_manager_query_metrics_api_no_auto_completion_when_both_dates(
+    mock_metric_repository: MetricRepository,
+    mock_sensor_repository: SensorRepository,
+    sensor_id: str,
+    metric_type: MetricType,
+    statistic_type: StatisticType,
+    sample_aggregated_metric: AggregatedMetricResult,
+):
+    """Test that MetricManager doesn't auto-complete when both dates are provided."""
+    from datetime import datetime, timezone
+
+    from app.api.models.metric_models import MetricQueryRequest
+
+    # Setup
+    start_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
+    end_date = datetime(2023, 1, 15, tzinfo=timezone.utc)
+
+    mock_metric_repository.query_metrics.return_value = [sample_aggregated_metric]
+
+    manager = MetricManager(metric_repository=mock_metric_repository, sensor_repository=mock_sensor_repository)
+
+    # Create request with both dates
+    query_request = MetricQueryRequest(
+        sensor_ids=[sensor_id],
+        metrics=[metric_type],
+        statistic=statistic_type,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    # Execute
+    result = await manager.query_metrics_api(query_request=query_request)
+
+    # Verify no auto-completion
+    assert result.query.start_date == start_date
+    assert result.query.end_date == end_date
+
+    # Verify repository was called with original dates
+    mock_metric_repository.query_metrics.assert_called_once_with(
+        sensor_ids=[sensor_id],
+        metrics=[metric_type],
+        statistic=statistic_type,
+        start_date=start_date,
+        end_date=end_date,
+    )

@@ -32,15 +32,12 @@ class PostgreSQLMetricRepository(MetricRepository):
 
     async def query_metrics(
         self,
+        statistic: StatisticType,
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
-        statistic: StatisticType | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> list[AggregatedMetricResult]:
-        if statistic is None:
-            raise ValueError("Statistic type must be specified for aggregated queries")
-
         query = self._build_aggregation_query(statistic, sensor_ids, metrics, start_date, end_date)
 
         try:

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 
 from app.api.dependencies import get_metric_manager
 from app.api.models.metric_models import (
@@ -9,7 +10,7 @@ from app.api.models.metric_models import (
     MetricQueryResponse,
 )
 from app.services.metrics_manager import MetricManager
-from app.shared.exceptions import SensorNotFoundError, ValidationError
+from app.shared.exceptions import SensorNotFoundError
 from app.shared.models import MetricType, StatisticType
 
 router = APIRouter()

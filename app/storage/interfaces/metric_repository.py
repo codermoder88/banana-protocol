@@ -12,9 +12,9 @@ class MetricRepository(ABC):
     @abstractmethod
     async def query_metrics(
         self,
+        statistic: StatisticType,
         sensor_ids: list[str] | None = None,
         metrics: list[MetricType] | None = None,
-        statistic: StatisticType | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> list[AggregatedMetricResult]:
