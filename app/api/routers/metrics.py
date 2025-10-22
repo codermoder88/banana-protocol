@@ -6,7 +6,6 @@ from app.api.dependencies import get_metric_manager
 from app.api.models.metric_models import (
     MetricCreateRequest,
     MetricCreateResponse,
-    MetricQueryRequest,
     MetricQueryResponse,
 )
 from app.services.metrics_manager import MetricManager
@@ -32,33 +31,24 @@ async def add_sensor_metrics(
         raise HTTPException(status_code=500, detail=f"Failed to record metric: {str(e)}")
 
 
-def _parse_date_string(date_str: str | None, field_name: str) -> datetime | None:
-    if date_str is None:
-        return None
-
-    try:
-        return datetime.fromisoformat(date_str)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid {field_name} format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"
-        )
-
-
 @router.get("/query", response_model=MetricQueryResponse)
 async def query_metrics(
     sensor_ids: list[str] | None = Query(None, description="IDs of sensors to include"),
     metrics: list[MetricType] = Query(..., description="Metrics to query (temperature, humidity)"),
     statistic: StatisticType = Query(..., description="Statistic to calculate"),
-    start_date: str | None = Query(None, description="Start date (ISO format)"),
-    end_date: str | None = Query(None, description="End date (ISO format)"),
+    start_date: datetime | None = Query(None, description="Start date (ISO format)"),
+    end_date: datetime | None = Query(None, description="End date (ISO format)"),
     metric_manager: MetricManager = Depends(get_metric_manager),
 ) -> MetricQueryResponse:
     try:
-        start_dt = _parse_date_string(start_date, "start_date")
-        end_dt = _parse_date_string(end_date, "end_date")
+        from app.api.models.metric_models import MetricQueryRequest
 
         query_request = MetricQueryRequest(
-            sensor_ids=sensor_ids, metrics=metrics, statistic=statistic, start_date=start_dt, end_date=end_dt
+            sensor_ids=sensor_ids,
+            metrics=metrics,
+            statistic=statistic,
+            start_date=start_date,
+            end_date=end_date,
         )
         return await metric_manager.query_metrics_api(query_request=query_request)
     except ValidationError as e:

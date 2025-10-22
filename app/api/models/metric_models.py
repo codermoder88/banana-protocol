@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from app.shared.models import MetricType, StatisticType
 
@@ -8,16 +8,7 @@ from app.shared.models import MetricType, StatisticType
 class MetricCreateRequest(BaseModel):
     timestamp: datetime = Field(..., description="Timestamp of the metric measurement")
     metric_type: MetricType = Field(..., description="Type of metric (temperature or humidity)")
-    value: float = Field(..., description="Metric value")
-
-    @field_validator("value")
-    @classmethod
-    def validate_value(cls, value: float) -> float:
-        if not isinstance(value, (int, float)):
-            raise ValueError("Value must be a number")
-        if value < -1000 or value > 1000:
-            raise ValueError("Value must be between -1000 and 1000")
-        return float(value)
+    value: float = Field(..., ge=-1000, le=1000, description="Metric value")
 
 
 class MetricQueryRequest(BaseModel):

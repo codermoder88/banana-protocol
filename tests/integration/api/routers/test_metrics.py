@@ -140,8 +140,8 @@ def test_query_metrics_invalid_date_format(
         },
     )
 
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert "Failed to query metrics" in response.json()["detail"]
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert "detail" in response.json()
 
 
 def test_query_metrics_general_error(
